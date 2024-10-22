@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"context"
 	"github.com/docker/docker/client"
 	"github.com/sirrobot01/lamba/pkg/event"
 	"github.com/sirrobot01/lamba/pkg/function"
@@ -17,12 +16,13 @@ func GetDockerClient() *client.Client {
 type Runtime interface {
 	Init() error
 	Shutdown() error
-	GetCmd(event event.InvokeEvent, fn function.Function) []string
-	Execute(ctx context.Context, event event.InvokeEvent, fn function.Function) ([]byte, error)
+	GetCmd(event event.Event, fn function.Function) []string
+	GetImage() string
 }
 
 type Manager struct {
 	runtimes map[string]Runtime
+	mu       sync.Mutex
 }
 
 func NewManager() *Manager {
@@ -31,30 +31,47 @@ func NewManager() *Manager {
 	if err != nil {
 		panic(err)
 	}
-	runtimes := make(map[string]Runtime)
 	return &Manager{
-		runtimes: runtimes,
+		runtimes: make(map[string]Runtime),
 	}
 }
 
-func (m *Manager) Register(runtimes map[string]Runtime) {
+func (m *Manager) Register(runtimes map[string]Runtime) error {
 	var wg sync.WaitGroup
+	errorChan := make(chan error, len(runtimes))
+
 	for name, runtime := range runtimes {
 		wg.Add(1)
 		go func(name string, runtime Runtime) {
 			defer wg.Done()
-			err := runtime.Init()
-			if err != nil {
-				panic(err)
+			if err := runtime.Init(); err != nil {
+				errorChan <- err
 			}
+			m.mu.Lock()
 			m.runtimes[name] = runtime
+			m.mu.Unlock()
 		}(name, runtime)
 	}
+
+	// Wait for all goroutines to finish
 	wg.Wait()
+	// Close the channel after all goroutines are done
+	close(errorChan)
+
+	// Check for any errors
+	for err := range errorChan {
+		if err != nil {
+			return err // Return the first error encountered
+		}
+	}
+
+	return nil
 
 }
 
 func (m *Manager) Get(name string) (Runtime, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	runtime, exists := m.runtimes[name]
 	return runtime, exists
 }

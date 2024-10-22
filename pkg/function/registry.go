@@ -16,7 +16,7 @@ type Registry struct {
 
 func NewRegistry() *Registry {
 	currentDir, _ := os.Getwd()
-	filePath := filepath.Join(currentDir, ".lamba_functions.json")
+	filePath := filepath.Join(currentDir, "db", "functions.json")
 	fr := &Registry{
 		functions: make(map[string]Function),
 		filePath:  filePath,
@@ -75,4 +75,11 @@ func (fr *Registry) List() []Function {
 		functions = append(functions, metadata)
 	}
 	return functions
+}
+
+func (fr *Registry) Delete(name string) {
+	fr.mu.Lock()
+	defer fr.mu.Unlock()
+	delete(fr.functions, name)
+	_ = fr.saveToFile()
 }

@@ -1,22 +1,28 @@
 ## Lamba(A self-hosted [AWS Lambda](https://aws.amazon.com/lambda/) clone)
 
+![Home](docs/images/home.png)
+
 #### WIP
 
 Lamba is a self-hosted AWS Lambda clone written in Go. It is designed to be compatible with the AWS Lambda API, but it is not a drop-in replacement
 
-This only supports the Go runtime at the moment.
+This only supports Python and Node.js runtime for now
 
 ### Features
 
 - [x] Adding a function
-- [x] Invoking a function via
-    - [x] HTTP
-    - [x] Direct CLI invocation
+- [x] Invoking a function
 - [x] List functions
-- [x] List runtimes
+- [x] List events
+
+### Prerequisites
+
+- Docker: 
+  - You need to have Docker installed on your machine to run this. You can download it from [here](https://docs.docker.com/get-docker/)
 
 
 ### Installation
+
 
 #### From Binary
 
@@ -27,41 +33,22 @@ You can download the pre-built binaries for different platforms from the [Releas
 #### From Source
 
 ```bash
-go get -u github.com/sirrobot01/lamba
+go install -u github.com/sirrobot01/lamba
 ```
 
 ### Usage
 
-```bash
-lamba --help
-```
-
-### Examples
-
-You can see a sample function in the `examples` directory
-
-#### Adding a function from a go file
+- Start the server
 
 ```bash
-lamba add --name hello --runtime go --handler Handler --file hello.go
+lamba
 ```
 
-#### Adding a function from a directory
 
-```bash
-lamba add --name hello --runtime go --handler Handler --file .
-```
-
-#### Invoking a function
-
-```bash
-lamba invoke --function hello --payload '{"name": "world"}'
-```
-
-Check [CLI.md](docs/cli.md) for more information
+- Prepare your function code and then zip it
 
 ### Roadmap
 
-- [ ] Add support for more runtimes(Python, Node.js, etc.)
+- [ ] Add support for more runtimes(Go, Rust, etc.)
 - [ ] Add support for more event sources
 - [ ] Add support for more triggers

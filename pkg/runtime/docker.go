@@ -49,7 +49,11 @@ func (dr *DockerRuntime) Shutdown() error {
 	return nil
 }
 
-func (dr *DockerRuntime) GetCmd(event event.InvokeEvent, fn function.Function) []string {
+func (dr *DockerRuntime) GetImage() string {
+	return dr.image
+}
+
+func (dr *DockerRuntime) GetCmd(event event.Event, fn function.Function) []string {
 	cmd := []string{fn.Handler}
 	payload := string(event.Payload)
 	if payload != "" {
@@ -58,16 +62,17 @@ func (dr *DockerRuntime) GetCmd(event event.InvokeEvent, fn function.Function) [
 	return cmd
 }
 
-func (dr *DockerRuntime) Execute(ctx context.Context, event event.InvokeEvent, fn function.Function) ([]byte, error) {
-	cmd := dr.GetCmd(event, fn)
+func Execute(r Runtime, ctx context.Context, event event.Event, fn function.Function) ([]byte, error) {
+	cmd := r.GetCmd(event, fn)
 	containerConfig := &container.Config{
-		Image: dr.image,
-		Cmd:   cmd,
-		Tty:   false,
+		Image:      r.GetImage(),
+		Cmd:        cmd,
+		Tty:        false,
+		WorkingDir: "/app",
 	}
 	resp, err := dockerClient.ContainerCreate(ctx, containerConfig, &container.HostConfig{
 		Binds: []string{
-			fmt.Sprintf("%s:/app", fn.Name),
+			fmt.Sprintf("%s:/app", fn.CodePath),
 		},
 	}, nil, nil, fn.Name)
 	if err != nil {
@@ -101,7 +106,7 @@ func (dr *DockerRuntime) Execute(ctx context.Context, event event.InvokeEvent, f
 	output := buf.String()
 
 	// Remove the container
-	if err := dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{}); err != nil {
+	if err := dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
 		return nil, err
 	}
 	return []byte(output), nil

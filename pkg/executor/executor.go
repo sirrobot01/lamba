@@ -4,29 +4,26 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirrobot01/lamba/pkg/event"
-	function2 "github.com/sirrobot01/lamba/pkg/function"
+	"github.com/sirrobot01/lamba/pkg/function"
 	"github.com/sirrobot01/lamba/pkg/runtime"
 	"time"
 )
 
 type Executor struct {
-	FunctionRegistry *function2.Registry
+	FunctionRegistry *function.Registry
 	RuntimeManager   *runtime.Manager
+	EventManager     *event.Manager
 }
 
-func NewExecutor(registry *function2.Registry, manager *runtime.Manager) *Executor {
+func NewExecutor(registry *function.Registry, rtnManager *runtime.Manager, eventManager *event.Manager) *Executor {
 	return &Executor{
 		FunctionRegistry: registry,
-		RuntimeManager:   manager,
+		RuntimeManager:   rtnManager,
+		EventManager:     eventManager,
 	}
 }
 
 func (e *Executor) Execute(invoker, funcName string, payload []byte) ([]byte, error) {
-	ev := event.InvokeEvent{
-		Name:      invoker,
-		Payload:   payload,
-		InvokedAt: time.Now(),
-	}
 	metadata, exists := e.FunctionRegistry.Get(funcName)
 	if !exists {
 		return nil, fmt.Errorf("function %s not found", funcName)
@@ -36,14 +33,22 @@ func (e *Executor) Execute(invoker, funcName string, payload []byte) ([]byte, er
 	if !exists {
 		return nil, fmt.Errorf("runtime %s not found", metadata.Runtime)
 	}
+	ev := e.EventManager.Add(invoker, funcName, metadata.Runtime, payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(metadata.Timeout)*time.Second)
 	defer cancel()
-	return rtn.Execute(ctx, ev, metadata)
+	result, err := runtime.Execute(rtn, ctx, ev, metadata)
+	ev.Result = result
+	if err != nil {
+		e.EventManager.MarkFailed(ev, err)
+		return nil, err
+	}
+	e.EventManager.MarkCompleted(ev)
+	return result, nil
 }
 
 func (e *Executor) CreateFunction(name string, runtime string, handler string, timeout int, codePath string, preExec string) error {
-	fn := function2.Function{
+	fn := function.Function{
 		Name:     name,
 		Runtime:  runtime,
 		Handler:  handler,
@@ -61,5 +66,10 @@ func (e *Executor) CreateFunction(name string, runtime string, handler string, t
 	}
 
 	e.FunctionRegistry.Register(fn)
+	return nil
+}
+
+func (e *Executor) DeleteFunction(name string) error {
+	e.FunctionRegistry.Delete(name)
 	return nil
 }

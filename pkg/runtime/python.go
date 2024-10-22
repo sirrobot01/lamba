@@ -20,12 +20,12 @@ func NewPythonRuntime() *PythonRuntime {
 	}
 }
 
-func (r *PythonRuntime) GetCmd(event event.InvokeEvent, fn function.Function) []string {
+func (r *PythonRuntime) GetCmd(event event.Event, fn function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
 	pythonCmd := fmt.Sprintf(
 		"import json; from %s import %s; result = %s(json.loads('%s'), json.loads('%s')); print(json.dumps(result))",
 		fn.Name, fn.Handler, fn.Handler, eventJson, fnJSON,
 	)
-	return []string{"python", "-c", fmt.Sprintf(pythonCmd, fn.Name, fn.Handler, eventJson, fnJSON)}
+	return []string{"python", "-c", pythonCmd}
 }

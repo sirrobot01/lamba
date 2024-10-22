@@ -20,7 +20,7 @@ func NewNodeJSRuntime() *NodeJSRuntime {
 	}
 }
 
-func (nd *NodeJSRuntime) GetCmd(event event.InvokeEvent, fn function.Function) []string {
+func (nd *NodeJSRuntime) GetCmd(event event.Event, fn function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
 

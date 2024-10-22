@@ -201,3 +201,7 @@ fabric.properties
 .DS_Store
 tmp/
 functions/**
+assets/*
+!assets/.gitkeep
+db/*
+!db/.gitkeep
