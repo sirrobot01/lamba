@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/sirrobot01/lamba/cmd/function"
-	"github.com/sirrobot01/lamba/cmd/invoke"
-	"github.com/sirrobot01/lamba/cmd/runtime"
-	"github.com/sirrobot01/lamba/cmd/serve"
-	"github.com/sirrobot01/lamba/pkg/core"
+	"github.com/sirrobot01/lamba/pkg/executor"
+	"github.com/sirrobot01/lamba/pkg/function"
+	"github.com/sirrobot01/lamba/pkg/invoker"
+	runtime2 "github.com/sirrobot01/lamba/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -34,19 +33,22 @@ func newRootCmd() *cobra.Command {
 
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
-	registry := core.NewFunctionRegistry()
-	runtimeManager := core.NewRuntimeManager()
-	goRuntime := core.NewGoRuntime()
-	runtimeManager.Register("go", goRuntime)
-	executor := core.NewExecutor(registry, runtimeManager)
-	listener := core.NewHTTPListener(executor, "8080")
+	registry := function.NewRegistry()
+	runtimeManager := runtime2.NewManager()
+	runtimes := map[string]runtime2.Runtime{
+		"python": runtime2.NewPythonRuntime(),
+		"nodejs": runtime2.NewNodeJSRuntime(),
+	}
+	runtimeManager.Register(runtimes)
+	ex := executor.NewExecutor(registry, runtimeManager)
+	httpInvoker := invoker.NewHTTPInvoker(ex, "8080")
 
-	rootCmd.AddCommand(runtime.NewCmd(executor))
-	rootCmd.AddCommand(function.NewCmd(executor))
-	rootCmd.AddCommand(invoke.NewCmd(executor))
+	rootCmd.AddCommand(NewRuntimeCmd(ex))
+	rootCmd.AddCommand(NewFunctionCmd(ex))
+	rootCmd.AddCommand(NewInvokerCmd(ex))
 
 	// Add a new command to start the server
-	rootCmd.AddCommand(serve.NewCmd(listener))
+	rootCmd.AddCommand(NewServeCmd(httpInvoker))
 
 	return rootCmd
 }

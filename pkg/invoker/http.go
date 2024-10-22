@@ -1,8 +1,9 @@
-package core
+package invoker
 
 import (
 	"errors"
 	"fmt"
+	"github.com/sirrobot01/lamba/pkg/executor"
 	"io"
 	"log"
 	"net/http"
@@ -10,37 +11,30 @@ import (
 	"time"
 )
 
-// Listener is a struct that represents a function Listener http, event, cli, etc
-
-type Listener interface {
-	Start() error
-	Stop() error
+type HTTPInvoker struct {
+	port   string
+	ex     *executor.Executor
+	server *http.Server
+	logger *log.Logger
 }
 
-type HTTPListener struct {
-	port     string
-	executor *Executor
-	server   *http.Server
-	logger   *log.Logger
-}
-
-// NewHTTPListener creates a new Listener instance
-func NewHTTPListener(executor *Executor, port string) Listener {
-	return &HTTPListener{
-		executor: executor,
-		port:     port,
-		logger:   log.New(os.Stdout, "HTTP: ", log.Ldate|log.Ltime|log.Lshortfile),
+// NewHTTPInvoker creates a new Invoker instance
+func NewHTTPInvoker(ex *executor.Executor, port string) Invoker {
+	return &HTTPInvoker{
+		ex:     ex,
+		port:   port,
+		logger: log.New(os.Stdout, "HTTP: ", log.Ldate|log.Ltime|log.Lshortfile),
 	}
 }
 
 // Invoke executes a function with the given name and payload
 
-func (h *HTTPListener) Start() error {
+func (h *HTTPInvoker) Start() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/invoke", h.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("function")
 		body, _ := io.ReadAll(r.Body)
-		result, err := h.executor.Execute(name, body)
+		result, err := h.ex.Execute("http", name, body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -60,7 +54,7 @@ func (h *HTTPListener) Start() error {
 	return nil
 }
 
-func (h *HTTPListener) loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+func (h *HTTPInvoker) loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -90,7 +84,7 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-func (h *HTTPListener) Stop() error {
+func (h *HTTPInvoker) Stop() error {
 	h.logger.Println("Stopping HTTP server")
 	return h.server.Shutdown(nil)
 }

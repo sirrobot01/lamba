@@ -1,11 +1,11 @@
-package invoke
+package cmd
 
 import (
-	"github.com/sirrobot01/lamba/pkg/core"
+	"github.com/sirrobot01/lamba/pkg/executor"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd(executor *core.Executor) *cobra.Command {
+func NewInvokerCmd(executor *executor.Executor) *cobra.Command {
 	var (
 		functionName string
 		payload      string
@@ -17,7 +17,7 @@ func NewCmd(executor *core.Executor) *cobra.Command {
 			// Convert the payload to a byte array
 			payloadBytes := []byte(payload)
 			// Invoke the function
-			result, err := executor.Execute(functionName, payloadBytes)
+			result, err := executor.Execute("cli", functionName, payloadBytes)
 			if err != nil {
 				cmd.PrintErrf("Error invoking function: %s\n", err)
 			} else {
