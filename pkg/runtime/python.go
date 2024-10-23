@@ -20,7 +20,7 @@ func NewPythonRuntime() *PythonRuntime {
 	}
 }
 
-func (r *PythonRuntime) GetCmd(event event.Event, fn function.Function) []string {
+func (r *PythonRuntime) GetCmd(event *event.Event, fn *function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
 	pythonCmd := fmt.Sprintf(

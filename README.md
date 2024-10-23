@@ -33,7 +33,7 @@ You can download the pre-built binaries for different platforms from the [Releas
 #### From Source
 
 ```bash
-go install -u github.com/sirrobot01/lamba
+go install github.com/sirrobot01/lamba@latest
 ```
 
 ### Usage
@@ -41,7 +41,7 @@ go install -u github.com/sirrobot01/lamba
 - Start the server
 
 ```bash
-lamba
+lamba --port 8080
 ```
 
 

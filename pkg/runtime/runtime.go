@@ -14,9 +14,9 @@ func GetDockerClient() *client.Client {
 }
 
 type Runtime interface {
-	Init() error
-	Shutdown() error
-	GetCmd(event event.Event, fn function.Function) []string
+	Init(fn *function.Function) error
+	Shutdown(fn *function.Function) error
+	GetCmd(event *event.Event, fn *function.Function) []string
 	GetImage() string
 }
 
@@ -44,7 +44,7 @@ func (m *Manager) Register(runtimes map[string]Runtime) error {
 		wg.Add(1)
 		go func(name string, runtime Runtime) {
 			defer wg.Done()
-			if err := runtime.Init(); err != nil {
+			if err := runtime.Init(nil); err != nil {
 				errorChan <- err
 			}
 			m.mu.Lock()
@@ -84,9 +84,9 @@ func (m *Manager) List() []string {
 	return runtimes
 }
 
-func (m *Manager) Shutdown() {
+func (m *Manager) Shutdown(fn *function.Function) {
 	for _, runtime := range m.runtimes {
-		err := runtime.Shutdown()
+		err := runtime.Shutdown(fn)
 		if err != nil {
 			return
 		}

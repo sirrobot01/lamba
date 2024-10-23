@@ -31,7 +31,7 @@ templ CreateFunctionModal(ex *executor.Executor) {
 								type="text"
 								name="name"
 								required
-								class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 rounded"
+								class="mt-1 mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-4 py-2"
 							/>
 						</label>
 					</div>
@@ -42,7 +42,7 @@ templ CreateFunctionModal(ex *executor.Executor) {
 								type="text"
 								name="handler"
 								required
-								class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 rounded"
+								class="mt-1 mt-1 block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-4 py-2"
 							/>
 						</label>
 					</div>
@@ -81,7 +81,6 @@ templ CreateFunctionModal(ex *executor.Executor) {
 											class="sr-only"
 										/>
 									</label>
-									<p class="pl-1">or drag and drop</p>
 								</div>
 								<p class="text-xs text-gray-500">ZIP up to 10MB</p>
 							</div>
@@ -110,10 +109,9 @@ templ CreateFunctionModal(ex *executor.Executor) {
 								name="memory"
 								class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2  rounded"
 							>
-								<option value="128 MB">128 MB</option>
-								<option value="256 MB">256 MB</option>
-								<option value="512 MB">512 MB</option>
-								<option value="1024 MB">1024 MB</option>
+							    for memStr, _ := range ex.MemoryManager.List() {
+							        <option value={ memStr } selected?={memStr == ex.MemoryManager.Default}>{ memStr }</option>
+							    }
 							</select>
 						</label>
 					</div>
@@ -125,7 +123,8 @@ templ CreateFunctionModal(ex *executor.Executor) {
 								class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2  rounded"
 							>
 								<option value="3">3</option>
-								<option value="30" selected>30</option>
+								<option value="10" selected>10</option>
+								<option value="30">30</option>
 								<option value="60">60</option>
 								<option value="300">300</option>
 								<option value="900">900</option>

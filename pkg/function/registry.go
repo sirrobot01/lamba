@@ -14,9 +14,12 @@ type Registry struct {
 	filePath  string
 }
 
-func NewRegistry() *Registry {
-	currentDir, _ := os.Getwd()
-	filePath := filepath.Join(currentDir, "db", "functions.json")
+func NewRegistry(configDir string) *Registry {
+	filePath := filepath.Join(configDir, "db", "functions.json")
+	err := os.MkdirAll(filepath.Dir(filePath), 0755)
+	if err != nil {
+		return nil
+	}
 	fr := &Registry{
 		functions: make(map[string]Function),
 		filePath:  filePath,
@@ -54,16 +57,18 @@ func (fr *Registry) saveToFile() error {
 	return nil
 }
 
-func (fr *Registry) Register(metadata Function) {
+func (fr *Registry) Register(fn Function) {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
-	fr.functions[metadata.Name] = metadata
-	_ = fr.saveToFile()
+	fr.functions[fn.Name] = fn
+	go func() {
+		_ = fr.saveToFile()
+	}()
 }
 
 func (fr *Registry) Get(name string) (Function, bool) {
-	metadata, exists := fr.functions[name]
-	return metadata, exists
+	fn, exists := fr.functions[name]
+	return fn, exists
 }
 
 func (fr *Registry) List() []Function {
@@ -71,8 +76,8 @@ func (fr *Registry) List() []Function {
 	defer fr.mu.RUnlock()
 
 	functions := make([]Function, 0, len(fr.functions))
-	for _, metadata := range fr.functions {
-		functions = append(functions, metadata)
+	for _, fn := range fr.functions {
+		functions = append(functions, fn)
 	}
 	return functions
 }
@@ -81,5 +86,16 @@ func (fr *Registry) Delete(name string) {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
 	delete(fr.functions, name)
-	_ = fr.saveToFile()
+	go func() {
+		_ = fr.saveToFile()
+	}()
+}
+
+func (fr *Registry) Update(fn Function) {
+	fr.mu.Lock()
+	defer fr.mu.Unlock()
+	fr.functions[fn.Name] = fn
+	go func() {
+		_ = fr.saveToFile()
+	}()
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/sirrobot01/lamba/common"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +18,12 @@ type Manager struct {
 	filePath string
 }
 
-func NewManager() *Manager {
-	currentDir, _ := os.Getwd()
-	filePath := filepath.Join(currentDir, "db", "events.json")
+func NewManager(configDir string) *Manager {
+	filePath := filepath.Join(configDir, "db", "events.json")
+	err := os.MkdirAll(filepath.Dir(filePath), 0755)
+	if err != nil {
+		return nil
+	}
 	manager := &Manager{
 		Events:   make(map[string]Event),
 		filePath: filePath,
@@ -59,7 +63,7 @@ func (m *Manager) saveToFile() error {
 	return nil
 }
 
-func (m *Manager) Add(trigger, fn, runtime string, payload []byte) Event {
+func (m *Manager) Add(trigger, fn, runtime, payload string) Event {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := Event{
@@ -67,12 +71,14 @@ func (m *Manager) Add(trigger, fn, runtime string, payload []byte) Event {
 		Trigger:   trigger,
 		Function:  fn,
 		Runtime:   runtime,
-		Payload:   payload,
+		Payload:   common.ParsePayload(payload),
 		StartedAt: time.Now(),
 		Started:   true,
 	}
 	m.Events[e.ID] = e
-	_ = m.saveToFile()
+	go func() {
+		_ = m.saveToFile()
+	}()
 	return e
 }
 
@@ -87,6 +93,7 @@ func (m *Manager) Update(e Event) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Events[e.ID] = e
+	_ = m.saveToFile()
 }
 
 func (m *Manager) List() []Event {
@@ -124,8 +131,8 @@ type Event struct {
 	Trigger  string `json:"trigger"`
 	Function string `json:"function"`
 	Runtime  string `json:"runtime"`
-	Payload  []byte `json:"payload"`
-	Result   []byte `json:"result"`
+	Payload  any    `json:"payload"`
+	Result   any    `json:"result"`
 
 	// Status
 	Started   bool   `json:"started"`
@@ -139,10 +146,23 @@ type Event struct {
 	FailedAt    time.Time `json:"failed_at"`
 }
 
-func (i *Event) ToJSON() string {
-	j, err := json.Marshal(i)
+func (e *Event) ToJSON() string {
+	if e == nil {
+		return ""
+	}
+
+	j, err := json.Marshal(e)
 	if err != nil {
 		return ""
 	}
+
 	return strings.Replace(string(j), "'", "\\'", -1)
+}
+
+func (e *Event) GetPayload() string {
+	return e.Payload.(string)
+}
+
+func (e *Event) GetResult() string {
+	return e.Result.(string)
 }

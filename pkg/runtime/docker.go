@@ -1,10 +1,8 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/sirrobot01/lamba/pkg/event"
@@ -26,7 +24,7 @@ func NewDockerRuntime(name, image, version string) *DockerRuntime {
 	}
 }
 
-func (dr *DockerRuntime) Init() error {
+func (dr *DockerRuntime) Init(fn *function.Function) error {
 	var err error
 
 	ctx := context.Background()
@@ -37,16 +35,30 @@ func (dr *DockerRuntime) Init() error {
 		fmt.Println("Pulling image...")
 		reader, err := dockerClient.ImagePull(ctx, dr.image, image.PullOptions{})
 		if err != nil {
-			panic(err)
+			return err
 		}
-		io.ReadAll(reader)
-		reader.Close()
+		_, _ = io.ReadAll(reader)
+		_ = reader.Close()
+	}
+	if fn != nil {
+		containerId, err := dr.createContainer(ctx, fn)
+		if err != nil {
+			return err
+		}
+		fn.ContainerID = containerId
 	}
 	return nil
 }
 
-func (dr *DockerRuntime) Shutdown() error {
-	return nil
+func (dr *DockerRuntime) createContainer(ctx context.Context, fn *function.Function) (string, error) {
+	cm := NewContainerManager(fn, dr.GetImage())
+	return cm.getOrCreateContainer(ctx)
+}
+
+func (dr *DockerRuntime) Shutdown(fn *function.Function) error {
+	// Stop and remove container, gracefully
+	cm := NewContainerManager(fn, dr.GetImage())
+	return cm.Cleanup(true)
 }
 
 func (dr *DockerRuntime) GetImage() string {
@@ -55,60 +67,25 @@ func (dr *DockerRuntime) GetImage() string {
 
 func (dr *DockerRuntime) GetCmd(event event.Event, fn function.Function) []string {
 	cmd := []string{fn.Handler}
-	payload := string(event.Payload)
+	payload := event.GetPayload()
 	if payload != "" {
 		cmd = append(cmd, payload)
 	}
 	return cmd
 }
 
-func Execute(r Runtime, ctx context.Context, event event.Event, fn function.Function) ([]byte, error) {
+func Execute(ctx context.Context, r Runtime, event *event.Event, fn *function.Function) (string, error) {
 	cmd := r.GetCmd(event, fn)
-	containerConfig := &container.Config{
-		Image:      r.GetImage(),
-		Cmd:        cmd,
-		Tty:        false,
-		WorkingDir: "/app",
-	}
-	resp, err := dockerClient.ContainerCreate(ctx, containerConfig, &container.HostConfig{
-		Binds: []string{
-			fmt.Sprintf("%s:/app", fn.CodePath),
-		},
-	}, nil, nil, fn.Name)
+	cm := NewContainerManager(fn, r.GetImage())
+	stdout, stderr, err := cm.RunCommand(ctx, cmd)
+	fn.ContainerID = cm.containerID
+	fn.LastRun = cm.lastUsed
+
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	if err := dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return nil, err
+	if stderr != "" {
+		return "", fmt.Errorf(stderr)
 	}
-	statusCh, errCh := dockerClient.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return nil, err
-		}
-	case <-statusCh:
-	}
-
-	out, err := dockerClient.ContainerLogs(ctx, resp.ID, container.LogsOptions{ShowStdout: true, ShowStderr: false})
-	if err != nil {
-		return nil, err
-	}
-
-	// Read the output
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, out)
-	if err != nil {
-		return nil, err
-	}
-
-	output := buf.String()
-
-	// Remove the container
-	if err := dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
-		return nil, err
-	}
-	return []byte(output), nil
-
+	return stdout, nil
 }
