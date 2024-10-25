@@ -127,12 +127,13 @@ func (m *Manager) MarkFailed(e Event, err error) {
 }
 
 type Event struct {
-	ID       string `json:"id"`
-	Trigger  string `json:"trigger"`
-	Function string `json:"function"`
-	Runtime  string `json:"runtime"`
-	Payload  any    `json:"payload"`
-	Result   any    `json:"result"`
+	ID       string   `json:"id"`
+	Trigger  string   `json:"trigger"`
+	Function string   `json:"function"`
+	Runtime  string   `json:"runtime"`
+	Payload  any      `json:"payload"`
+	Result   any      `json:"result"`
+	Debug    []string `json:"debug"`
 
 	// Status
 	Started   bool   `json:"started"`

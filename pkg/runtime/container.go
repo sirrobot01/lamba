@@ -66,34 +66,14 @@ func (cm *ContainerManager) getOrCreateContainer(ctx context.Context) (string, e
 		return "", err
 	}
 
-	statusCh, errCh := dockerClient.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			// Clean up the container if there's an error
-			if err := dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
-				return "", err
-			}
-		}
-	case status := <-statusCh:
-		if status.StatusCode != 0 {
-			// Clean up if container exits with non-zero status
-			if err := dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
-				return "", fmt.Errorf("container exited with status code: %d", status.StatusCode)
-			}
-		}
-	case <-time.After(10 * time.Second): // Add timeout to prevent infinite wait
-		// Container is still running, which is what we want for our long-running container
-		break
-	}
-
 	cm.containerID = resp.ID
 	cm.lastUsed = time.Now()
 	return resp.ID, nil
 }
 
 func (cm *ContainerManager) RunCommand(ctx context.Context, cmd []string) (string, string, error) {
-	containerID, err := cm.getOrCreateContainer(ctx)
+	newCtx := context.Background() // Create new context to avoid cancelling the parent context due to fetching new image/container
+	containerID, err := cm.getOrCreateContainer(newCtx)
 	if err != nil {
 		return "", "", err
 	}

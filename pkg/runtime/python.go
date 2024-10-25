@@ -23,9 +23,29 @@ func NewPythonRuntime() *PythonRuntime {
 func (r *PythonRuntime) GetCmd(event *event.Event, fn *function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
-	pythonCmd := fmt.Sprintf(
-		"import json; from %s import %s; result = %s(json.loads('%s'), json.loads('%s')); print(json.dumps(result))",
-		fn.Name, fn.Handler, fn.Handler, eventJson, fnJSON,
-	)
+	pythonCmd := `
+import json
+import sys
+from io import StringIO
+from %s import %s
+
+# Capture prints
+captured_output = StringIO()
+sys.stdout = captured_output
+
+# Run function
+result = %s(json.loads('%s'), json.loads('%s'))
+
+# Get printed output
+prints = captured_output.getvalue()
+
+# Restore stdout
+sys.stdout = sys.__stdout__
+print(json.dumps({
+	"result": result,
+	"debug": prints.split("\n")
+}))
+`
+	pythonCmd = fmt.Sprintf(pythonCmd, fn.Name, fn.Handler, fn.Handler, eventJson, fnJSON)
 	return []string{"python", "-c", pythonCmd}
 }

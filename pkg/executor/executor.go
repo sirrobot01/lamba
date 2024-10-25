@@ -2,8 +2,8 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/sirrobot01/lamba/common"
 	"github.com/sirrobot01/lamba/pkg/event"
 	"github.com/sirrobot01/lamba/pkg/function"
 	"github.com/sirrobot01/lamba/pkg/runtime"
@@ -41,11 +41,20 @@ func (e *Executor) Execute(invoker, funcName string, payload string) (string, er
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(fn.Timeout)*time.Second)
 	defer cancel()
 	result, err := runtime.Execute(ctx, rtn, &ev, &fn)
-	ev.Result = common.ParsePayload(result)
 	if err != nil {
 		e.EventManager.MarkFailed(ev, err)
 		return "", err
 	}
+	var res struct {
+		Result any      `json:"result"`
+		Debug  []string `json:"debug"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &res); err != nil {
+		return "", err
+	}
+	ev.Result = res.Result
+	ev.Debug = res.Debug
 	e.EventManager.MarkCompleted(ev)
 	e.FunctionRegistry.Update(fn)
 	return result, nil
