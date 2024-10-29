@@ -7,16 +7,21 @@ import (
 )
 
 type PythonRuntime struct {
-	DockerRuntime
+	ContainerdRuntime
 }
 
 func NewPythonRuntime() *PythonRuntime {
+	runtime, err := NewContainerdRuntime(
+		"python",
+		"python:3.9-alpine",
+		"3.9",
+	)
+	if err != nil {
+		return nil
+	}
+
 	return &PythonRuntime{
-		DockerRuntime: DockerRuntime{
-			name:    "python",
-			image:   "python:3.9-alpine",
-			version: "3.9",
-		},
+		ContainerdRuntime: *runtime,
 	}
 }
 
@@ -42,8 +47,8 @@ prints = captured_output.getvalue()
 # Restore stdout
 sys.stdout = sys.__stdout__
 print(json.dumps({
-	"result": result,
-	"debug": prints.split("\n")
+    "result": result,
+    "debug": prints.split("\n")
 }))
 `
 	pythonCmd = fmt.Sprintf(pythonCmd, fn.Name, fn.Handler, fn.Handler, eventJson, fnJSON)

@@ -3,45 +3,42 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/sirrobot01/lamba/pkg/event"
 	"github.com/sirrobot01/lamba/pkg/function"
-	"io"
 )
 
-type DockerRuntime struct {
+type ContainerdRuntime struct {
 	name    string
 	image   string
 	version string
 }
 
-func NewDockerRuntime(name, image, version string) *DockerRuntime {
-	return &DockerRuntime{
+func NewContainerdRuntime(name, image, version string) (*ContainerdRuntime, error) {
+
+	return &ContainerdRuntime{
 		name:    name,
 		image:   image,
 		version: version,
-	}
+	}, nil
 }
 
-func (dr *DockerRuntime) Init(fn *function.Function) error {
-	var err error
+func (cr *ContainerdRuntime) Init(fn *function.Function) error {
+	ctx := namespaces.WithNamespace(context.Background(), "lamba")
 
-	ctx := context.Background()
-
-	// Check if image exists, pull if not
-	_, _, err = dockerClient.ImageInspectWithRaw(ctx, dr.image)
-	if client.IsErrNotFound(err) {
+	// Pull image if it doesn't exist
+	_, err := containerdClient.GetImage(ctx, cr.image)
+	if err != nil {
 		fmt.Println("Pulling image...")
-		reader, err := dockerClient.ImagePull(ctx, dr.image, image.PullOptions{})
+		_, err = containerdClient.Pull(ctx, cr.image, containerd.WithPullUnpack)
 		if err != nil {
 			return err
 		}
-		_, _ = io.ReadAll(reader)
-		_ = reader.Close()
 	}
+
 	if fn != nil {
-		containerId, err := dr.createContainer(ctx, fn)
+		containerId, err := cr.createContainer(ctx, fn)
 		if err != nil {
 			return err
 		}
@@ -50,22 +47,21 @@ func (dr *DockerRuntime) Init(fn *function.Function) error {
 	return nil
 }
 
-func (dr *DockerRuntime) createContainer(ctx context.Context, fn *function.Function) (string, error) {
-	cm := NewContainerManager(fn, dr.GetImage())
+func (cr *ContainerdRuntime) createContainer(ctx context.Context, fn *function.Function) (string, error) {
+	cm := NewContainerManager(fn, cr.GetImage())
 	return cm.getOrCreateContainer(ctx)
 }
 
-func (dr *DockerRuntime) Shutdown(fn *function.Function) error {
-	// Stop and remove container, gracefully
-	cm := NewContainerManager(fn, dr.GetImage())
+func (cr *ContainerdRuntime) Shutdown(fn *function.Function) error {
+	cm := NewContainerManager(fn, cr.GetImage())
 	return cm.Cleanup(true)
 }
 
-func (dr *DockerRuntime) GetImage() string {
-	return dr.image
+func (cr *ContainerdRuntime) GetImage() string {
+	return cr.image
 }
 
-func (dr *DockerRuntime) GetCmd(event event.Event, fn function.Function) []string {
+func (cr *ContainerdRuntime) GetCmd(event event.Event, fn function.Function) []string {
 	cmd := []string{fn.Handler}
 	payload := event.GetPayload()
 	if payload != "" {

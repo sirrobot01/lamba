@@ -31,10 +31,11 @@ func Start() error {
 		return nil
 	}
 
-	showWelcome()
-
 	registry := function.NewRegistry(config)
-	runtimeManager := runtime.NewManager()
+	runtimeManager, err := runtime.NewManager()
+	if err != nil {
+		return err
+	}
 	eventManager := event.NewManager(config)
 	memory := runtime.NewMemoryManager("128MB")
 	runtimes := map[string]runtime.Runtime{
@@ -46,6 +47,7 @@ func Start() error {
 	}
 	ex := executor.NewExecutor(registry, runtimeManager, eventManager, memory)
 	s := server.NewServer(ex, port)
+	showWelcome()
 	if err := s.Start(); err != nil {
 		return err
 	}

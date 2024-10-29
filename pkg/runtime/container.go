@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/oci"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirrobot01/lamba/pkg/function"
 	"sync"
 	"time"
@@ -34,87 +36,118 @@ func (cm *ContainerManager) getOrCreateContainer(ctx context.Context) (string, e
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
-	// Check if container exists and is recent
 	if cm.containerID != "" {
-		// Check if container is still running
-		_, err := dockerClient.ContainerInspect(ctx, cm.containerID)
+		container, err := containerdClient.LoadContainer(ctx, cm.containerID)
 		if err == nil {
-			cm.lastUsed = time.Now()
-			return cm.containerID, nil
+			task, err := container.Task(ctx, nil)
+			if err == nil {
+				status, err := task.Status(ctx)
+				if err == nil && status.Status == containerd.Running {
+					cm.lastUsed = time.Now()
+					return cm.containerID, nil
+				}
+			}
 		}
 	}
 
-	// Create new container
-	hostConf := &container.HostConfig{
-		Binds: []string{
-			fmt.Sprintf("%s:/app", cm.CodePath),
-		},
-	}
-	resp, err := dockerClient.ContainerCreate(ctx,
-		&container.Config{
-			Image:      cm.image,
-			Cmd:        []string{"tail", "-f", "/dev/null"}, // Keep container running
-			Tty:        true,
-			WorkingDir: "/app",
-		},
-		hostConf, nil, nil, cm.containerName)
+	image, err := containerdClient.GetImage(ctx, cm.image)
 	if err != nil {
 		return "", err
 	}
-	// Start container
-	if err := dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+
+	container, err := containerdClient.NewContainer(
+		ctx,
+		cm.containerName,
+		containerd.WithNewSnapshot(cm.containerName+"-snapshot", image),
+		containerd.WithNewSpec(
+			oci.WithImageConfig(image),
+			oci.WithHostNamespace(specs.NetworkNamespace),
+			oci.WithMounts([]specs.Mount{
+				{
+					Type:        "bind",
+					Source:      cm.CodePath,
+					Destination: "/app",
+					Options:     []string{"rbind", "rw"},
+				},
+			}),
+			oci.WithProcessArgs("tail", "-f", "/dev/null"),
+		),
+	)
+	if err != nil {
 		return "", err
 	}
 
-	cm.containerID = resp.ID
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
+	if err != nil {
+		return "", err
+	}
+
+	if err := task.Start(ctx); err != nil {
+		return "", err
+	}
+
+	cm.containerID = container.ID()
 	cm.lastUsed = time.Now()
-	return resp.ID, nil
+	return container.ID(), nil
 }
 
 func (cm *ContainerManager) RunCommand(ctx context.Context, cmd []string) (string, string, error) {
-	newCtx := context.Background() // Create new context to avoid cancelling the parent context due to fetching new image/container
-	containerID, err := cm.getOrCreateContainer(newCtx)
+	containerID, err := cm.getOrCreateContainer(ctx)
 	if err != nil {
 		return "", "", err
 	}
 
-	execConfig := container.ExecOptions{
-		Cmd:          cmd,
-		AttachStdout: true,
-		AttachStderr: true,
-		WorkingDir:   "/app",
-	}
-
-	execID, err := dockerClient.ContainerExecCreate(ctx, containerID, execConfig)
+	container, err := containerdClient.LoadContainer(ctx, containerID)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Create response stream
-	resp, err := dockerClient.ContainerExecAttach(ctx, execID.ID, container.ExecAttachOptions{})
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Close()
-
-	// Read the output
-	var outBuf, errBuf bytes.Buffer
-	_, err = stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader)
+	_, err = container.Spec(ctx)
 	if err != nil {
 		return "", "", err
 	}
 
-	inspectResp, err := dockerClient.ContainerExecInspect(ctx, execID.ID)
+	task, err := container.Task(ctx, nil)
 	if err != nil {
 		return "", "", err
 	}
 
-	if inspectResp.ExitCode != 0 {
-		return outBuf.String(), errBuf.String(),
-			fmt.Errorf("command failed with exit code %d", inspectResp.ExitCode)
+	var stdout, stderr bytes.Buffer
+	process, err := task.Exec(ctx,
+		cm.containerName+"-exec",
+		&specs.Process{
+			Args: cmd,
+			Cwd:  "/app",
+		},
+		cio.NewCreator(
+			cio.WithStreams(nil, &stdout, &stderr),
+		),
+	)
+	if err != nil {
+		return "", "", err
 	}
 
-	return outBuf.String(), errBuf.String(), nil
+	statusC, err := process.Wait(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	if err := process.Start(ctx); err != nil {
+		return "", "", err
+	}
+
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		return "", "", err
+	}
+
+	if code != 0 {
+		return stdout.String(), stderr.String(),
+			fmt.Errorf("command failed with exit code %d", code)
+	}
+
+	return stdout.String(), stderr.String(), nil
 }
 
 func (cm *ContainerManager) Cleanup(force bool) error {
@@ -123,24 +156,24 @@ func (cm *ContainerManager) Cleanup(force bool) error {
 
 	if cm.containerID != "" && (time.Since(cm.lastUsed) > 10*time.Minute || force) {
 		ctx := context.Background()
-		err := dockerClient.ContainerStop(ctx, cm.containerID, container.StopOptions{})
+		container, err := containerdClient.LoadContainer(ctx, cm.containerID)
 		if err != nil {
 			return err
 		}
-		err = dockerClient.ContainerRemove(ctx, cm.containerID, container.RemoveOptions{})
-		if err != nil {
+
+		task, err := container.Task(ctx, nil)
+		if err == nil {
+			_, err = task.Delete(ctx, containerd.WithProcessKill)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 			return err
 		}
+
 		cm.containerID = ""
 	}
 	return nil
-}
-
-func (cm *ContainerManager) isContainerHealthy(containerID string) bool {
-	ctx := context.Background()
-	inspect, err := dockerClient.ContainerInspect(ctx, containerID)
-	if err != nil {
-		return false
-	}
-	return inspect.State.Running
 }

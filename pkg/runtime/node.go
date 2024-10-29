@@ -7,16 +7,21 @@ import (
 )
 
 type NodeJSRuntime struct {
-	DockerRuntime
+	ContainerdRuntime
 }
 
 func NewNodeJSRuntime() *NodeJSRuntime {
+	runtime, err := NewContainerdRuntime(
+		"nodejs",
+		"node:14-alpine",
+		"14",
+	)
+	if err != nil {
+		return nil
+	}
+
 	return &NodeJSRuntime{
-		DockerRuntime: DockerRuntime{
-			name:    "nodejs",
-			image:   "node:14-alpine",
-			version: "14",
-		},
+		ContainerdRuntime: *runtime,
 	}
 }
 
@@ -25,34 +30,34 @@ func (nd *NodeJSRuntime) GetCmd(event *event.Event, fn *function.Function) []str
 	fnJSON := fn.ToJSON()
 
 	nodeCmd := `
-	const { %s } = require('./%s.js');
+    const { %s } = require('./%s.js');
 
-	// Capture console.log output
-	const logs = [];
-	const originalConsoleLog = console.log;
-	console.log = (...args) => {
-		logs.push(args.map(arg => String(arg)).join(' '));
-	};
-	
-	const eventData = JSON.parse('%s');
-	const fnData = JSON.parse('%s');
-	async function main() {
-		const result = await %s(eventData, fnData);
-		
-		// Restore console.log
-		console.log = originalConsoleLog;
-		
-		// Output final result with captured logs
-		console.log(JSON.stringify({
-			result,
-			debug: logs
-		}));
-	}
-	
-	main().catch(error => {
-		console.error(error);
-		process.exit(1);
-	});
+    // Capture console.log output
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (...args) => {
+        logs.push(args.map(arg => String(arg)).join(' '));
+    };
+    
+    const eventData = JSON.parse('%s');
+    const fnData = JSON.parse('%s');
+    async function main() {
+        const result = await %s(eventData, fnData);
+        
+        // Restore console.log
+        console.log = originalConsoleLog;
+        
+        // Output final result with captured logs
+        console.log(JSON.stringify({
+            result,
+            debug: logs
+        }));
+    }
+    
+    main().catch(error => {
+        console.error(error);
+        process.exit(1);
+    });
 `
 
 	nodeCmd = fmt.Sprintf(nodeCmd, fn.Handler, fn.Name, eventJson, fnJSON, fn.Handler)
