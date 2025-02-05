@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/sirrobot01/lamba/common"
 	"os"
 	"path/filepath"
@@ -37,14 +38,14 @@ func (m *Manager) load() error {
 	data, err := os.ReadFile(m.filePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Printf("Error reading function data: %v\n", err)
+			log.Info().Msgf("Error reading function data: %v\n", err)
 		}
 		return err
 	}
 
 	err = json.Unmarshal(data, &m.Events)
 	if err != nil {
-		fmt.Printf("Error parsing function data: %v\n", err)
+		log.Info().Msgf("Error parsing function data: %v\n", err)
 	}
 	return err
 }
@@ -63,7 +64,7 @@ func (m *Manager) saveToFile() error {
 	return nil
 }
 
-func (m *Manager) Add(trigger, fn, runtime, payload string) Event {
+func (m *Manager) Add(trigger, fn, runtime, payload string) *Event {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := Event{
@@ -79,7 +80,7 @@ func (m *Manager) Add(trigger, fn, runtime, payload string) Event {
 	go func() {
 		_ = m.saveToFile()
 	}()
-	return e
+	return &e
 }
 
 func (m *Manager) Get(id string) (Event, bool) {
@@ -113,17 +114,17 @@ func (m *Manager) Remove(id string) {
 	_ = m.saveToFile()
 }
 
-func (m *Manager) MarkCompleted(e Event) {
+func (m *Manager) MarkCompleted(e *Event) {
 	e.Completed = true
 	e.CompletedAt = time.Now()
-	m.Update(e)
+	m.Update(*e)
 }
 
-func (m *Manager) MarkFailed(e Event, err error) {
+func (m *Manager) MarkFailed(e *Event, err error) {
 	e.Failed = true
 	e.FailedAt = time.Now()
 	e.ErrorStr = err.Error()
-	m.Update(e)
+	m.Update(*e)
 }
 
 type Event struct {

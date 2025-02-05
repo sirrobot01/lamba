@@ -3,11 +3,10 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/rs/zerolog/log"
 	"github.com/sirrobot01/lamba/pkg/executor"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -40,16 +39,16 @@ func (s *Server) Start() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("Starting server on %s", srv.Addr)
+	log.Info().Msgf("Starting server on %s", srv.Addr)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			fmt.Printf("Error starting server: %v\n", err)
+			log.Info().Msgf("Error starting server: %v\n", err)
 			stop()
 		}
 	}()
 
 	<-ctx.Done()
-	fmt.Println("Shutting down gracefully...")
+	log.Info().Msgf("Shutting down gracefully...")
 	return srv.Shutdown(context.Background())
 }

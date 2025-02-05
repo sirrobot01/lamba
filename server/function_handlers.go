@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 	"github.com/sirrobot01/lamba/common"
 	"github.com/sirrobot01/lamba/server/components"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,7 +27,7 @@ func (s *Server) handleFunctionsCreate(w http.ResponseWriter, r *http.Request) {
 	file, h, err := r.FormFile("file")
 	if err != nil {
 		// Handle case where no file was uploaded
-		log.Printf("No file uploaded: %v", err)
+		log.Info().Msgf("No file uploaded: %v", err)
 	}
 	defer file.Close()
 	if filepath.Ext(h.Filename) != ".zip" {
@@ -60,7 +60,7 @@ func (s *Server) handleFunctionsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.ex.CreateFunction(name, _runtime, handler, timeout, functionDir, preExec); err != nil {
-		log.Printf("Error creating function: %v", err)
+		log.Info().Err(err).Msgf("Error creating function")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

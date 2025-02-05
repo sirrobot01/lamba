@@ -1,4 +1,4 @@
-package runtime
+package languages
 
 import (
 	"fmt"
@@ -6,21 +6,7 @@ import (
 	"github.com/sirrobot01/lamba/pkg/function"
 )
 
-type NodeJSRuntime struct {
-	DockerRuntime
-}
-
-func NewNodeJSRuntime() *NodeJSRuntime {
-	return &NodeJSRuntime{
-		DockerRuntime: DockerRuntime{
-			name:    "nodejs",
-			image:   "node:14-alpine",
-			version: "14",
-		},
-	}
-}
-
-func (nd *NodeJSRuntime) GetCmd(event *event.Event, fn *function.Function) []string {
+func (r *Runtime) GetNodeJSCmd(event *event.Event, fn *function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
 

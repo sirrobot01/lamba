@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"github.com/rs/zerolog/log"
 	"os"
 
 	"github.com/sirrobot01/lamba/cmd"
@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if err := cmd.Start(); err != nil {
-		fmt.Println(err)
+		log.Info().Msgf("Error starting server: %v\n", err)
 		os.Exit(1)
 	}
 }

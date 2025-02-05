@@ -1,4 +1,4 @@
-package runtime
+package languages
 
 import (
 	"fmt"
@@ -6,21 +6,7 @@ import (
 	"github.com/sirrobot01/lamba/pkg/function"
 )
 
-type PythonRuntime struct {
-	DockerRuntime
-}
-
-func NewPythonRuntime() *PythonRuntime {
-	return &PythonRuntime{
-		DockerRuntime: DockerRuntime{
-			name:    "python",
-			image:   "python:3.9-alpine",
-			version: "3.9",
-		},
-	}
-}
-
-func (r *PythonRuntime) GetCmd(event *event.Event, fn *function.Function) []string {
+func (r *Runtime) GetPythonCmd(event *event.Event, fn *function.Function) []string {
 	eventJson := event.ToJSON()
 	fnJSON := fn.ToJSON()
 	pythonCmd := `
@@ -47,5 +33,5 @@ print(json.dumps({
 }))
 `
 	pythonCmd = fmt.Sprintf(pythonCmd, fn.Name, fn.Handler, fn.Handler, eventJson, fnJSON)
-	return []string{"python", "-c", pythonCmd}
+	return []string{"/usr/local/bin/python3", "-c", pythonCmd}
 }

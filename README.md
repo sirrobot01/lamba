@@ -1,54 +1,57 @@
-## Lamba(A self-hosted [AWS Lambda](https://aws.amazon.com/lambda/) clone)
+# Lamba
+
+A self-hosted alternative to AWS Lambda, written in Go.
 
 ![Home](docs/images/home.png)
 
-#### WIP
+## Features
 
-Lamba is a self-hosted AWS Lambda clone written in Go. It is designed to be compatible with the AWS Lambda API, but it is not a drop-in replacement
+- ✅ Function Management (Add, List, Invoke)
+- ✅ Event Tracking
+- ✅ Supports Python, Node.js, and Go
+- ✅ Compatible with Containerd and Docker engines
 
-This only supports Python and Node.js runtime for now
+## Installation
 
-### Features
+### Option 1: Binary
+Download pre-built binaries from [Releases](https://github.com/sirrobot01/lamba/releases/)
 
-- [x] Adding a function
-- [x] Invoking a function
-- [x] List functions
-- [x] List events
-
-### Prerequisites
-
-- Docker: 
-  - You need to have Docker installed on your machine to run this. You can download it from [here](https://docs.docker.com/get-docker/)
-
-
-### Installation
-
-
-#### From Binary
-
-You can download the pre-built binaries for different platforms from the [Releases](https://github.com/sirrobot01/lamba/releases/) page. Extract them using tar, move it to your $PATH and you are ready to go.
-
-```bash
-
-#### From Source
-
+### Option 2: From Source
 ```bash
 go install github.com/sirrobot01/lamba@latest
 ```
 
-### Usage
+## Quick Start
 
-- Start the server
-
+### Using Containerd
 ```bash
-lamba --port 8080
+sudo ./lamba --engine containerd --port 8080
 ```
 
+### Using Docker
+```bash
+./lamba --engine docker --port 8080
+```
 
-- Prepare your function code and then zip it
+## Function Structure
+```
+function/
+├── function.py
+├── requirements.txt
 
-### Roadmap
+# Create deployment package
+zip -r function.zip function
+```
 
-- [ ] Add support for more runtimes(Go, Rust, etc.)
-- [ ] Add support for more event sources
-- [ ] Add support for more triggers
+## Prerequisites
+- [Containerd](https://containerd.io/) (Note: Rootless installation requires manual service start)
+  <br>OR
+- [Docker](https://www.docker.com/)
+
+## Roadmap
+- Additional runtime support (Rust)
+- Enhanced event sources
+- Additional triggers
+
+## Status
+Project is under active development. Please report issues via GitHub.

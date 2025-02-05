@@ -3,6 +3,7 @@ package function
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -33,14 +34,14 @@ func (fr *Registry) loadFromFile() {
 	data, err := os.ReadFile(fr.filePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Printf("Error reading function data: %v\n", err)
+			log.Info().Msgf("Error reading function data: %v\n", err)
 		}
 		return
 	}
 
 	err = json.Unmarshal(data, &fr.functions)
 	if err != nil {
-		fmt.Printf("Error parsing function data: %v\n", err)
+		log.Info().Msgf("Error parsing function data: %v\n", err)
 	}
 }
 func (fr *Registry) saveToFile() error {

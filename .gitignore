@@ -205,3 +205,4 @@ assets/*
 !assets/.gitkeep
 db/*
 !db/.gitkeep
+dist/*

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"github.com/sirrobot01/lamba/pkg/event"
 	"github.com/sirrobot01/lamba/pkg/function"
 	"github.com/sirrobot01/lamba/pkg/runtime"
@@ -27,6 +28,7 @@ func NewExecutor(registry *function.Registry, rtnManager *runtime.Manager, event
 }
 
 func (e *Executor) Execute(invoker, funcName string, payload string) (string, error) {
+	log.Debug().Msgf("[%s] Executing function %s with payload %s", invoker, funcName, payload)
 	fn, exists := e.FunctionRegistry.Get(funcName)
 	if !exists {
 		return "", fmt.Errorf("function %s not found", funcName)
@@ -40,8 +42,9 @@ func (e *Executor) Execute(invoker, funcName string, payload string) (string, er
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(fn.Timeout)*time.Second)
 	defer cancel()
-	result, err := runtime.Execute(ctx, rtn, &ev, &fn)
+	result, err := rtn.Run(ctx, ev, &fn)
 	if err != nil {
+		log.Info().Err(err).Msgf("Error executing function %s", funcName)
 		e.EventManager.MarkFailed(ev, err)
 		return "", err
 	}
@@ -92,10 +95,14 @@ func (e *Executor) DeleteFunction(name string) error {
 	}
 	go func(f function.Function) {
 		// Get runtime
-		rtn, _ := e.RuntimeManager.Get(f.Runtime)
+		rtn, ok := e.RuntimeManager.Get(f.Runtime)
 		// Shutdown Container
-		if rtn != nil {
-			_ = rtn.Shutdown(&f)
+		if ok {
+			if err := rtn.Shutdown(&f); err != nil {
+				log.Info().Err(err).Msgf("Error shutting down function %s", f.Name)
+			}
+		} else {
+			log.Info().Msgf("Runtime %s not found", f.Runtime)
 		}
 	}(fn)
 
