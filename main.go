@@ -2,13 +2,12 @@ package main
 
 import (
 	"github.com/rs/zerolog/log"
+	"github.com/sirrobot01/lamba/cmd/lamba"
 	"os"
-
-	"github.com/sirrobot01/lamba/cmd"
 )
 
 func main() {
-	if err := cmd.Start(); err != nil {
+	if err := lamba.Start(); err != nil {
 		log.Info().Msgf("Error starting server: %v\n", err)
 		os.Exit(1)
 	}

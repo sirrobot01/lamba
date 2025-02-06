@@ -1,0 +1,12 @@
+package templates
+
+import (
+    "github.com/sirrobot01/lamba/internal/server/components"
+    "github.com/sirrobot01/lamba/internal/executor"
+)
+
+templ Home(ex *executor.Executor) {
+    @components.Layout() {
+        @components.FunctionList(ex)
+    }
+}

@@ -34,10 +34,10 @@ sudo ./lamba --engine containerd --port 8080
 ```
 
 ## Function Structure
+You can find examples in the [examples](examples) directory.
 ```
-function/
-├── function.py
-├── requirements.txt
+function_name/
+├── function_name.py
 
 # Create deployment package
 zip -r function.zip function
